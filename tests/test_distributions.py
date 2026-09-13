@@ -1958,7 +1958,7 @@ class TestHistPlotBivariate:
 
         x, y = rng.lognormal(0, 1, (2, 500))
         kws = dict(x=x, y=y)
-        _, (ax1, ax2, ax3) = plt.subplots(3)
+        _, (ax1, ax2, ax3, ax4) = plt.subplots(4)
 
         # A user-supplied norm should be used as-is, without conflicting with
         # the vmin/vmax values that seaborn sets by default (GH3875)
@@ -1974,6 +1974,48 @@ class TestHistPlotBivariate:
         # Explicit vmin/vmax should continue to set the color limits
         histplot(**kws, vmin=.5, vmax=10, ax=ax3)
         assert ax3.collections[0].get_clim() == (.5, 10)
+
+        # An explicit norm=None should be treated like no norm at all
+        histplot(**kws, norm=None, ax=ax4)
+        counts, _ = Histogram()(x, y)
+        assert ax4.collections[0].get_clim() == (0, counts.max())
+
+    def test_mesh_norm_with_hue(self, rng):
+
+        # Two groups with very different counts, so the group drawn first
+        # determines visibly different color limits
+        x = rng.lognormal(0, 1, 500)
+        y = rng.lognormal(0, 1, 500)
+        hue = np.repeat([0, 1], [100, 400])
+        kws = dict(x=x, y=y, hue=hue)
+        _, (ax1, ax2, ax3) = plt.subplots(3)
+
+        hist = Histogram()
+        bin_kws = hist.define_bin_params(x, y)
+        sub_hist = Histogram(bins=bin_kws["bins"])
+        count0, _ = sub_hist(x[hue == 0], y[hue == 0])
+        count1, _ = sub_hist(x[hue == 1], y[hue == 1])
+        clim0 = (count0[count0 > 0].min(), count0.max())
+        clim1 = (count1[count1 > 0].min(), count1.max())
+        assert clim0 != clim1
+
+        # Every group shares the norm instance supplied by the caller
+        norm = mpl.colors.LogNorm()
+        histplot(**kws, norm=norm, hue_order=[0, 1], ax=ax1)
+        clims = [mesh.get_clim() for mesh in ax1.collections]
+        assert all(mesh.norm is norm for mesh in ax1.collections)
+        assert clims == [clim0, clim0]
+
+        # The shared norm is autoscaled from the first drawn group, so the
+        # color limits depend on the order of the hue levels
+        norm = mpl.colors.LogNorm()
+        histplot(**kws, norm=norm, hue_order=[1, 0], ax=ax2)
+        assert [mesh.get_clim() for mesh in ax2.collections] == [clim1, clim1]
+
+        # Once a norm is supplied, common_norm does not affect the color limits
+        norm = mpl.colors.LogNorm()
+        histplot(**kws, norm=norm, hue_order=[0, 1], common_norm=False, ax=ax3)
+        assert [mesh.get_clim() for mesh in ax3.collections] == clims
 
     def test_mesh_thresh(self, long_df):
 
