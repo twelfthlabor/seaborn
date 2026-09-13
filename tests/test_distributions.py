@@ -1954,6 +1954,27 @@ class TestHistPlotBivariate:
             assert path.vertices[0, 0] == pytest.approx(10 ** x_i)
             assert path.vertices[0, 1] == pytest.approx(10 ** y_i)
 
+    def test_mesh_norm(self, rng):
+
+        x, y = rng.lognormal(0, 1, (2, 500))
+        kws = dict(x=x, y=y)
+        _, (ax1, ax2, ax3) = plt.subplots(3)
+
+        # A user-supplied norm should be used as-is, without conflicting with
+        # the vmin/vmax values that seaborn sets by default (GH3875)
+        norm = mpl.colors.LogNorm()
+        histplot(**kws, log_scale=(False, True), norm=norm, ax=ax1)
+        assert ax1.collections[0].norm is norm
+
+        # Limits defined on the norm should take precedence over the data range
+        norm = mpl.colors.LogNorm(vmin=.1, vmax=100)
+        histplot(**kws, norm=norm, ax=ax2)
+        assert ax2.collections[0].get_clim() == (.1, 100)
+
+        # Explicit vmin/vmax should continue to set the color limits
+        histplot(**kws, vmin=.5, vmax=10, ax=ax3)
+        assert ax3.collections[0].get_clim() == (.5, 10)
+
     def test_mesh_thresh(self, long_df):
 
         hist = Histogram()
