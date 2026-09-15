@@ -2017,6 +2017,19 @@ class TestHistPlotBivariate:
         histplot(**kws, norm=norm, hue_order=[0, 1], common_norm=False, ax=ax3)
         assert [mesh.get_clim() for mesh in ax3.collections] == clims
 
+    def test_mesh_string_norm(self, rng):
+
+        x, y = rng.lognormal(0, 1, (2, 500))
+
+        # A string norm is resolved by matplotlib and autoscaled to the
+        # positive counts, instead of picking up the default vmin=0 (GH3875)
+        ax = histplot(x=x, y=y, norm="log")
+        assert isinstance(ax.collections[0].norm, mpl.colors.LogNorm)
+
+        counts, _ = Histogram()(x, y)
+        vmin = counts[counts > 0].min()
+        assert ax.collections[0].get_clim() == (vmin, counts.max())
+
     def test_mesh_thresh(self, long_df):
 
         hist = Histogram()
