@@ -788,6 +788,15 @@ class _DistributionPlotter(VectorPlotter):
         if not user_norm:
             plot_kws.setdefault("vmin", 0)
 
+        # A shared norm instance is otherwise autoscaled from the first mesh
+        # drawn, which would clip the other groups, so scale it on all of them
+        norm = plot_kws.get("norm")
+        if common_color_norm and isinstance(norm, mpl.colors.Normalize):
+            all_heights = np.concatenate([np.ravel(h) for h in full_heights])
+            if thresh is not None:
+                all_heights = np.ma.masked_less_equal(all_heights, thresh)
+            norm.autoscale_None(all_heights)
+
         if common_color_norm and not user_norm:
             if pmax is not None:
                 vmax = self._quantile_to_level(full_heights, pmax)

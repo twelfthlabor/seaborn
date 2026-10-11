@@ -1999,23 +1999,29 @@ class TestHistPlotBivariate:
         clim1 = (count1[count1 > 0].min(), count1.max())
         assert clim0 != clim1
 
-        # Every group shares the norm instance supplied by the caller
+        # Every group shares the norm instance supplied by the caller, and the
+        # limits span all groups the same way the default common color scale
+        # does, so they do not depend on the hue order
+        default_ax = plt.figure().subplots()
+        histplot(**kws, ax=default_ax)
+        vmax = default_ax.collections[0].get_clim()[1]
+        vmin = min(m.get_array()[m.get_array() > 0].min()
+                   for m in default_ax.collections)
+        clim_all = (vmin, vmax)
         norm = mpl.colors.LogNorm()
         histplot(**kws, norm=norm, hue_order=[0, 1], ax=ax1)
-        clims = [mesh.get_clim() for mesh in ax1.collections]
         assert all(mesh.norm is norm for mesh in ax1.collections)
-        assert clims == [clim0, clim0]
+        assert [mesh.get_clim() for mesh in ax1.collections] == [clim_all] * 2
 
-        # The shared norm is autoscaled from the first drawn group, so the
-        # color limits depend on the order of the hue levels
         norm = mpl.colors.LogNorm()
         histplot(**kws, norm=norm, hue_order=[1, 0], ax=ax2)
-        assert [mesh.get_clim() for mesh in ax2.collections] == [clim1, clim1]
+        assert [mesh.get_clim() for mesh in ax2.collections] == [clim_all] * 2
 
-        # Once a norm is supplied, common_norm does not affect the color limits
+        # Without a common norm, the shared instance is scaled by the first
+        # group drawn, as matplotlib does for a reused norm
         norm = mpl.colors.LogNorm()
         histplot(**kws, norm=norm, hue_order=[0, 1], common_norm=False, ax=ax3)
-        assert [mesh.get_clim() for mesh in ax3.collections] == clims
+        assert [mesh.get_clim() for mesh in ax3.collections] == [clim0, clim0]
 
     def test_mesh_string_norm(self, rng):
 
